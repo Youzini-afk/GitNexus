@@ -21,6 +21,18 @@ type RateLimitRecord = {
   windowStartedAt: number;
 };
 
+type LoginLocale = 'en' | 'zh';
+
+type LoginCopy = {
+  lang: string;
+  title: string;
+  subtitle: string;
+  passwordLabel: string;
+  unlockButton: string;
+  switchLanguage: string;
+  invalidPassword: string;
+};
+
 export type AuthCleanup = () => void;
 
 export function parseAuthPassword(): string | null {
@@ -209,6 +221,53 @@ const escapeHtml = (value: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const LOGIN_COPY: Record<LoginLocale, LoginCopy> = {
+  en: {
+    lang: 'en',
+    title: 'GitNexus Login',
+    subtitle: 'Enter the deployment password to continue.',
+    passwordLabel: 'Password',
+    unlockButton: 'Unlock GitNexus',
+    switchLanguage: '中文',
+    invalidPassword: 'Invalid password.',
+  },
+  zh: {
+    lang: 'zh-CN',
+    title: 'GitNexus 登录',
+    subtitle: '输入部署密码以继续。',
+    passwordLabel: '密码',
+    unlockButton: '解锁 GitNexus',
+    switchLanguage: 'English',
+    invalidPassword: '密码错误。',
+  },
+};
+
+export function resolveLoginLocale(acceptLanguage: unknown): LoginLocale {
+  const header = Array.isArray(acceptLanguage) ? acceptLanguage.join(',') : acceptLanguage;
+  if (typeof header !== 'string') return 'en';
+
+  const candidates = header
+    .split(',')
+    .map((part, index) => {
+      const [range = '', ...params] = part.trim().split(';');
+      const primary = range.trim().toLowerCase().split('-')[0];
+      const qValue = params
+        .map((param) => param.trim())
+        .find((param) => param.toLowerCase().startsWith('q='))
+        ?.slice(2);
+      const parsedQ = qValue === undefined ? 1 : Number(qValue);
+      const q = Number.isFinite(parsedQ) ? parsedQ : 1;
+      return { primary, q, index };
+    })
+    .filter((candidate) => (candidate.primary === 'en' || candidate.primary === 'zh') && candidate.q > 0)
+    .sort((a, b) => b.q - a.q || a.index - b.index);
+
+  return candidates[0]?.primary === 'zh' ? 'zh' : 'en';
+}
+
+const normalizeLoginLocale = (value: unknown, fallback: LoginLocale): LoginLocale =>
+  value === 'zh' || value === 'en' ? value : fallback;
+
 export function normalizeNextPath(value: unknown): string {
   if (typeof value !== 'string') return '/';
   if (!value.startsWith('/') || value.startsWith('//')) return '/';
@@ -216,16 +275,20 @@ export function normalizeNextPath(value: unknown): string {
   return value;
 }
 
-export function loginPageHtml(message = '', next = '/'): string {
+export function loginPageHtml(message = '', next = '/', locale: LoginLocale = 'en'): string {
+  const copy = LOGIN_COPY[locale];
   const safeMessage = message ? `<div class="error">${escapeHtml(message)}</div>` : '';
-  const safeNext = escapeHtml(normalizeNextPath(next));
+  const normalizedNext = normalizeNextPath(next);
+  const safeNext = escapeHtml(normalizedNext);
+  const nextLocale = locale === 'zh' ? 'en' : 'zh';
+  const toggleHref = escapeHtml(`/login?next=${encodeURIComponent(normalizedNext)}&lang=${nextLocale}`);
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${copy.lang}" data-lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GitNexus Login</title>
+<title>${escapeHtml(copy.title)}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Outfit,system-ui,-apple-system,sans-serif;background:#06060a;color:#e4e4ed;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem}
@@ -237,20 +300,24 @@ input[type=password]{width:100%;background:#0a0a10;border:1px solid #2a2a3a;bord
 input[type=password]:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.18)}
 button{width:100%;margin-top:1rem;background:#7c3aed;color:white;border:0;border-radius:0.5rem;padding:0.75rem 0.875rem;font:inherit;font-weight:700;cursor:pointer}
 button:hover{background:#6d28d9}
+.locale-toggle{display:block;margin-top:1rem;text-align:center;color:#8888a0;text-decoration:none;font-size:.8125rem}
+.locale-toggle:hover{color:#e4e4ed;text-decoration:underline}
 .error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fecaca;border-radius:0.5rem;padding:0.75rem;margin-bottom:1rem;font-size:0.875rem}
 </style>
 </head>
 <body>
 <main class="card">
   <div class="logo">GitNexus</div>
-  <div class="subtitle">Enter the deployment password to continue.</div>
+  <div class="subtitle">${escapeHtml(copy.subtitle)}</div>
   ${safeMessage}
   <form method="post" action="/api/auth/login">
     <input type="hidden" name="next" value="${safeNext}">
-    <label for="password">Password</label>
+    <input type="hidden" name="lang" value="${locale}">
+    <label for="password">${escapeHtml(copy.passwordLabel)}</label>
     <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
-    <button type="submit">Unlock GitNexus</button>
+    <button type="submit">${escapeHtml(copy.unlockButton)}</button>
   </form>
+  <a class="locale-toggle" href="${toggleHref}">${escapeHtml(copy.switchLanguage)}</a>
 </main>
 </body>
 </html>`;
@@ -310,7 +377,8 @@ export function installAuth(app: express.Express, password: string | null): Auth
 
   app.get('/login', (req, res) => {
     writeNoStore(res);
-    res.type('html').send(loginPageHtml('', normalizeNextPath(req.query.next)));
+    const locale = normalizeLoginLocale(req.query.lang, resolveLoginLocale(req.headers['accept-language']));
+    res.type('html').send(loginPageHtml('', normalizeNextPath(req.query.next), locale));
   });
 
   app.post('/api/auth/login', express.urlencoded({ extended: false, limit: '100kb' }), (req, res) => {
@@ -342,7 +410,9 @@ export function installAuth(app: express.Express, password: string | null): Auth
         return;
       }
       if (wantsHtml(req)) {
-        res.status(401).type('html').send(loginPageHtml('Invalid password.', next));
+        const objectBody = typeof req.body === 'object' && req.body !== null ? req.body as Record<string, unknown> : {};
+        const locale = normalizeLoginLocale(objectBody.lang, resolveLoginLocale(req.headers['accept-language']));
+        res.status(401).type('html').send(loginPageHtml(LOGIN_COPY[locale].invalidPassword, next, locale));
         return;
       }
       res.status(401).json({ error: 'Invalid password' });

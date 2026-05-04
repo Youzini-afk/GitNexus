@@ -11,6 +11,7 @@ import {
   normalizeNextPath,
   parseAuthPassword,
   parseCookies,
+  resolveLoginLocale,
   verifyPassword,
 } from '../../src/server/auth.js';
 
@@ -228,6 +229,30 @@ describe('cookie and login helpers', () => {
     expect(html).toContain('Invalid &lt;password&gt;');
     expect(html).toContain('value="/clusters"');
   });
+
+  it('renders a Chinese login page when requested', () => {
+    const html = loginPageHtml('密码错误。', '/clusters', 'zh');
+    expect(html).toContain('<html lang="zh-CN" data-lang="zh">');
+    expect(html).toContain('GitNexus 登录');
+    expect(html).toContain('输入部署密码以继续。');
+    expect(html).toContain('密码错误。');
+    expect(html).toContain('解锁 GitNexus');
+    expect(html).toContain('name="lang" value="zh"');
+  });
+
+  it('keeps raw and escaped next paths separate in login links', () => {
+    const html = loginPageHtml('', '/clusters?tab=a&filter=b');
+    expect(html).toContain('value="/clusters?tab=a&amp;filter=b"');
+    expect(html).toContain('href="/login?next=%2Fclusters%3Ftab%3Da%26filter%3Db&amp;lang=zh"');
+  });
+
+  it('resolves login locale from Accept-Language', () => {
+    expect(resolveLoginLocale('zh-CN,zh;q=0.9,en;q=0.8')).toBe('zh');
+    expect(resolveLoginLocale('en-US,en;q=0.9,zh;q=0.8')).toBe('en');
+    expect(resolveLoginLocale('en-US;q=0.6,zh-CN;q=0.9')).toBe('zh');
+    expect(resolveLoginLocale('en-US,en;q=0.9')).toBe('en');
+    expect(resolveLoginLocale(undefined)).toBe('en');
+  });
 });
 
 describe('installAuth', () => {
@@ -280,6 +305,37 @@ describe('installAuth', () => {
       expect(response.status).toBe(200);
       expect(response.body).toContain('GitNexus');
       expect(response.body).toContain('value="/clusters"');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('serves the public login page in Chinese from lang query', async () => {
+    const { app, cleanup } = createProtectedApp('secret');
+    try {
+      const response = await request(app, { path: '/login?next=/clusters&lang=zh', headers: { Accept: 'text/html' } });
+      expect(response.status).toBe(200);
+      expect(response.body).toContain('GitNexus 登录');
+      expect(response.body).toContain('value="/clusters"');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('preserves selected Chinese locale after a failed HTML login', async () => {
+    const { app, cleanup } = createProtectedApp('secret');
+    try {
+      const response = await request(app, {
+        method: 'POST',
+        path: '/api/auth/login',
+        headers: { Accept: 'text/html', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'password=wrong&next=%2Fclusters&lang=zh',
+      });
+      expect(response.status).toBe(401);
+      expect(response.body).toContain('<html lang="zh-CN" data-lang="zh">');
+      expect(response.body).toContain('密码错误。');
+      expect(response.body).toContain('value="/clusters"');
+      expect(response.body).toContain('name="lang" value="zh"');
     } finally {
       cleanup();
     }
