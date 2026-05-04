@@ -160,6 +160,14 @@ describe('registerWebUI', () => {
     expect(res.send).toHaveBeenCalledWith(expect.stringContaining('#7c3aed'));
   });
 
+  it('SPA fallback marks HTML no-store when auth is enabled', async () => {
+    const app = createMockApp();
+    registerWebUI(app as any, '/some/dir', true);
+    const res = await invokeHandler(app, 'get', '/clusters');
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+    expect(res.sendFile).toHaveBeenCalledWith(path.join('/some/dir', 'index.html'));
+  });
+
   it('Cache-Control setHeaders sets no-cache for HTML, immutable for assets', () => {
     const captureHeaders = (filePath: string) => {
       const headers: Record<string, string> = {};
@@ -177,6 +185,24 @@ describe('registerWebUI', () => {
     });
     expect(captureHeaders('style.css')).toEqual({
       'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+  });
+
+  it('Cache-Control setHeaders uses private cache policy when auth is enabled', () => {
+    const captureHeaders = (filePath: string) => {
+      const headers: Record<string, string> = {};
+      const res = {
+        setHeader: (k: string, v: string) => {
+          headers[k] = v;
+        },
+      };
+      staticCacheControlSetHeaders(res as express.Response, filePath, true);
+      return headers;
+    };
+
+    expect(captureHeaders('index.html')).toEqual({ 'Cache-Control': 'no-store' });
+    expect(captureHeaders('app.js')).toEqual({
+      'Cache-Control': 'private, max-age=31536000, immutable',
     });
   });
 });

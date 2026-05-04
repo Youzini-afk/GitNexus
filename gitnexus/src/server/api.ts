@@ -35,6 +35,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { JobManager } from './analyze-job.js';
 import { assertString, escapeRegExp, BadRequestError } from './validation.js';
 import { extractRepoName, getCloneDir, cloneOrPull } from './git-clone.js';
+import { installAuth, parseAuthPassword } from './auth.js';
 
 const _require = createRequire(import.meta.url);
 const pkg = _require('../../package.json');
@@ -225,19 +226,30 @@ a.ext:hover{text-decoration:underline}
 </body>
 </html>`;
 
-export const staticCacheControlSetHeaders = (res: express.Response, filePath: string): void => {
+export const staticCacheControlSetHeaders = (
+  res: express.Response,
+  filePath: string,
+  authEnabled = false,
+): void => {
   if (filePath.endsWith('.html')) {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', authEnabled ? 'no-store' : 'no-cache');
   } else {
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader(
+      'Cache-Control',
+      authEnabled ? 'private, max-age=31536000, immutable' : 'public, max-age=31536000, immutable',
+    );
   }
 };
 
-export const registerWebUI = (app: express.Express, staticDir: string | null): void => {
+export const registerWebUI = (
+  app: express.Express,
+  staticDir: string | null,
+  authEnabled = false,
+): void => {
   if (staticDir) {
     app.use(
       express.static(staticDir, {
-        setHeaders: staticCacheControlSetHeaders,
+        setHeaders: (res, filePath) => staticCacheControlSetHeaders(res, filePath, authEnabled),
       }),
     );
     // ⚠ This must remain the LAST route before the global error handler.
@@ -245,6 +257,9 @@ export const registerWebUI = (app: express.Express, staticDir: string | null): v
     // so missing assets get real 404s instead of the SPA HTML.
     // Adding routes below this will be unreachable for non-API, non-asset paths.
     app.get(SPA_FALLBACK_REGEX, (_req, res) => {
+      if (authEnabled) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
       res.sendFile(path.join(staticDir, 'index.html'));
     });
   } else {
@@ -558,6 +573,11 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   const app = express();
   app.disable('x-powered-by');
 
+  const authPassword = parseAuthPassword();
+  if (authPassword) {
+    app.set('trust proxy', 1);
+  }
+
   // CORS: allow localhost, private/LAN networks, and the deployed site.
   // Non-browser requests (curl, server-to-server) have no origin and are allowed.
   // Disallowed origins get the response without Access-Control-Allow-Origin,
@@ -584,9 +604,11 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   // on OPTIONS requests and expects the allow header in the response.
   // Note: the actual Allow-Private-Network header is already set by the global
   // middleware above, so we just need to call next() here.
-  app.options('*', (_req, res, next) => {
+  app.options('*', (_req, _res, next) => {
     next();
   });
+
+  const cleanupAuth = installAuth(app, authPassword);
 
   // Initialize MCP backend (multi-repo, shared across all MCP sessions)
   const backend = new LocalBackend();
@@ -1710,7 +1732,7 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   const webDistDir = path.resolve(__dirname, '..', '..', 'web');
   const devWebDistDir = path.resolve(__dirname, '..', '..', '..', 'gitnexus-web', 'dist');
   const staticDir = await resolveWebDistDir(webDistDir, devWebDistDir);
-  registerWebUI(app, staticDir);
+  registerWebUI(app, staticDir, Boolean(authPassword));
 
   // Global error handler — catch anything the route handlers miss
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -1732,6 +1754,7 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
     const shutdown = async () => {
       console.log('\nShutting down...');
       server.close();
+      cleanupAuth();
       jobManager.dispose();
       embedJobManager.dispose();
       await cleanupMcp();
