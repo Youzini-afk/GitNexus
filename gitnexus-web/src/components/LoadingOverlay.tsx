@@ -1,10 +1,12 @@
 import type { PipelineProgress } from 'gitnexus-shared';
+import { useT } from '../i18n';
 
 interface LoadingOverlayProps {
   progress: PipelineProgress;
 }
 
 export const LoadingOverlay = ({ progress }: LoadingOverlayProps) => {
+  const t = useT();
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-void">
       {/* Background gradient effects */}
@@ -46,12 +48,15 @@ export const LoadingOverlay = ({ progress }: LoadingOverlayProps) => {
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-node-file" />
             <span>
-              {progress.stats.filesProcessed} / {progress.stats.totalFiles} files
+              {t('loadingOverlay.files', {
+                processed: progress.stats.filesProcessed,
+                total: progress.stats.totalFiles,
+              })}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-node-function" />
-            <span>{progress.stats.nodesCreated} nodes</span>
+            <span>{t('loadingOverlay.nodes', { count: progress.stats.nodesCreated })}</span>
           </div>
         </div>
       )}

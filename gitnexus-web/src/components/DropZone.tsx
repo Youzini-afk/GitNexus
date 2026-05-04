@@ -10,13 +10,12 @@ import { useBackend } from '../hooks/useBackend';
 import { OnboardingGuide } from './OnboardingGuide';
 import { AnalyzeOnboarding } from './AnalyzeOnboarding';
 import { RepoLanding } from './RepoLanding';
+import { useT } from '../i18n';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface DropZoneProps {
   onServerConnect?: (result: ConnectResult, serverUrl?: string) => void | Promise<void>;
 }
-
-// ── Crossfade wrapper ───────────────────────────────────────────────────────
-// Captures the outgoing children during fade-out, then swaps to the new children on fade-in.
 
 function Crossfade({ activeKey, children }: { activeKey: string; children: React.ReactNode }) {
   const [displayedKey, setDisplayedKey] = useState(activeKey);
@@ -24,7 +23,6 @@ function Crossfade({ activeKey, children }: { activeKey: string; children: React
   const snapshotRef = useRef<React.ReactNode>(children);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep snapshot up to date when NOT transitioning
   if (!isTransitioning && activeKey === displayedKey) {
     snapshotRef.current = children;
   }
@@ -34,7 +32,7 @@ function Crossfade({ activeKey, children }: { activeKey: string; children: React
       setIsTransitioning(true);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
-        snapshotRef.current = null; // clear snapshot — new children will render
+        snapshotRef.current = null;
         setDisplayedKey(activeKey);
         setIsTransitioning(false);
       }, 300);
@@ -57,32 +55,25 @@ function Crossfade({ activeKey, children }: { activeKey: string; children: React
   );
 }
 
-// ── Phase cards ─────────────────────────────────────────────────────────────
-
 function SuccessCard() {
+  const t = useT();
   return (
     <div
       className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-surface p-7"
       role="status"
       aria-live="polite"
     >
-      {/* Success glow */}
       <div className="pointer-events-none absolute -top-20 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-500/8 blur-3xl" />
-
       <div className="relative">
-        {/* Animated check icon */}
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
           <Check className="h-8 w-8 text-emerald-400" />
         </div>
-
         <h2 className="mb-2 text-center text-lg font-semibold text-emerald-400">
-          Server Connected
+          {t('dropZone.serverConnected')}
         </h2>
         <p className="text-center text-sm leading-relaxed text-text-secondary">
-          Preparing your code knowledge graph...
+          {t('dropZone.preparingGraph')}
         </p>
-
-        {/* Subtle progress hint */}
         <div className="mt-6 flex items-center justify-center gap-2">
           <div className="flex gap-1">
             {[0, 1, 2].map((i) => (
@@ -100,29 +91,24 @@ function SuccessCard() {
 }
 
 function LoadingCard({ message }: { message: string }) {
+  const t = useT();
   return (
     <div
       className="relative overflow-hidden rounded-3xl border border-accent/20 bg-surface p-7"
       role="status"
       aria-live="polite"
     >
-      {/* Loading glow */}
       <div className="pointer-events-none absolute -top-20 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-accent/8 blur-3xl" />
-
       <div className="relative">
-        {/* Spinner */}
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/20 to-accent-dim/10 shadow-glow-soft">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
         </div>
-
         <h2 className="mb-2 text-center text-lg font-semibold text-text-primary">
-          {message || 'Connecting...'}
+          {message || t('dropZone.connecting')}
         </h2>
         <p className="text-center text-sm leading-relaxed text-text-secondary">
-          This may take a moment for large repositories
+          {t('dropZone.largeRepoNote')}
         </p>
-
-        {/* Decorative sparkle */}
         <div className="mt-5 flex items-center justify-center">
           <Sparkles className="h-4 w-4 text-accent/30" />
         </div>
@@ -131,12 +117,10 @@ function LoadingCard({ message }: { message: string }) {
   );
 }
 
-// ── DropZone ─────────────────────────────────────────────────────────────────
-
 export const DropZone = ({ onServerConnect }: DropZoneProps) => {
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
 
-  // Backend polling for server detection
   const {
     isConnected,
     isProbing,
@@ -149,9 +133,6 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
   const autoConnectRan = useRef(false);
   const autoConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Connection state
-  // 'analyze'  = server up but zero repos indexed — show URL input
-  // 'landing'  = server up with indexed repos — show repo picker + analyze
   const [phase, setPhase] = useState<'onboarding' | 'analyze' | 'landing' | 'success' | 'loading'>(
     'onboarding',
   );
@@ -159,11 +140,9 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [detectedRepos, setDetectedRepos] = useState<BackendRepo[]>([]);
 
-  // Auto-connect to the detected server — fetch repo list and show the
-  // appropriate screen (landing with repo cards, or analyze for zero repos).
   const handleAutoConnect = async () => {
     setPhase('loading');
-    setLoadingMessage('Connecting...');
+    setLoadingMessage(t('dropZone.connecting'));
     setError(null);
 
     try {
@@ -173,13 +152,11 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
         autoConnectRan.current = false;
         return;
       }
-
-      // Show landing screen so the user can choose which repo to explore
       setDetectedRepos(repos);
       setPhase('landing');
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      const message = err instanceof Error ? err.message : 'Failed to connect';
+      const message = err instanceof Error ? err.message : t('dropZone.failedToConnect');
       setError(message);
       setPhase('onboarding');
     }
@@ -188,12 +165,10 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
   const handleAutoConnectRef = useRef(handleAutoConnect);
   handleAutoConnectRef.current = handleAutoConnect;
 
-  // Shared handler: connect to a specific repo by name (used by both repo
-  // card selection on the landing screen and post-analysis completion).
   const connectToRepo = (repoName: string) => {
     autoConnectRan.current = true;
     setPhase('loading');
-    setLoadingMessage('Loading graph...');
+    setLoadingMessage(t('loadingOverlay.processing'));
     setError(null);
 
     (async () => {
@@ -204,13 +179,15 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
           detectedBackendUrl,
           (p, downloaded, total) => {
             if (p === 'validating') {
-              setLoadingMessage('Validating server...');
+              setLoadingMessage(t('dropZone.validatingServer'));
             } else if (p === 'downloading') {
               const pct = total ? Math.round((downloaded / total) * 100) : null;
               const mb = (downloaded / (1024 * 1024)).toFixed(1);
-              setLoadingMessage(pct ? `Downloading graph... ${pct}%` : `Downloading... ${mb} MB`);
+              setLoadingMessage(
+                pct ? `${t('dropZone.downloadingGraph')} ${pct}%` : `${t('dropZone.downloadingGraph')} ${mb} MB`,
+              );
             } else if (p === 'extracting') {
-              setLoadingMessage('Processing graph...');
+              setLoadingMessage(t('dropZone.processingGraph'));
             }
           },
           abortController.signal,
@@ -221,7 +198,7 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError(err instanceof Error ? err.message : 'Failed to load graph');
+        setError(err instanceof Error ? err.message : t('dropZone.unknownError'));
         setPhase(detectedRepos.length > 0 ? 'landing' : 'analyze');
       } finally {
         abortControllerRef.current = null;
@@ -229,21 +206,18 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
     })();
   };
 
-  // Track when the initial probe finishes
   useEffect(() => {
     if (!isProbing && !initialProbeComplete) {
       setInitialProbeComplete(true);
     }
   }, [isProbing, initialProbeComplete]);
 
-  // Start polling once after initial probe fails
   useEffect(() => {
     if (initialProbeComplete && !isConnected && !isPolling && !autoConnectRan.current) {
       startPolling();
     }
   }, [initialProbeComplete, isConnected, isPolling, startPolling]);
 
-  // Auto-connect when server is detected
   useEffect(() => {
     if (isConnected && !autoConnectRan.current) {
       autoConnectRan.current = true;
@@ -252,9 +226,8 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
       autoConnectTimerRef.current = setTimeout(() => {
         autoConnectTimerRef.current = null;
         handleAutoConnectRef.current();
-      }, 1200); // hold success state long enough to register
+      }, 1200);
     }
-    // Server went away — reset to onboarding (or analyze if we were on analyze)
     if (!isConnected && autoConnectRan.current && !isProbing) {
       autoConnectRan.current = false;
       if (autoConnectTimerRef.current !== null) {
@@ -264,12 +237,8 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
       setPhase('onboarding');
       setError(null);
     }
-    // NOTE: No cleanup return here. The autoConnectTimerRef must survive effect
-    // re-runs (e.g. isProbing flipping false while the 1200ms window is active).
-    // The unmount cleanup effect below is the sole owner of timer cancellation.
   }, [isConnected, isProbing, stopPolling]);
 
-  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (autoConnectTimerRef.current !== null) clearTimeout(autoConnectTimerRef.current);
@@ -277,26 +246,25 @@ export const DropZone = ({ onServerConnect }: DropZoneProps) => {
     };
   }, []);
 
-  // Don't render until initial probe completes
   const displayPhase = !initialProbeComplete ? null : phase;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-void p-8">
-      {/* Background gradient effects */}
+      <div className="fixed top-4 right-4 z-10 rounded-lg border border-border-subtle bg-surface/80 backdrop-blur">
+        <LanguageSwitcher />
+      </div>
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
         <div className="absolute right-1/4 bottom-1/4 h-96 w-96 rounded-full bg-node-interface/10 blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-lg">
-        {/* Error — floats above the card */}
         {error && (
           <div className="mb-4 animate-fade-in rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-center text-sm text-red-400">
             {error}
           </div>
         )}
 
-        {/* Crossfade between phases */}
         {displayPhase && (
           <Crossfade activeKey={displayPhase}>
             {displayPhase === 'onboarding' && <OnboardingGuide isPolling={isPolling} />}
