@@ -23,6 +23,7 @@ import {
   type JobProgress,
 } from '../services/backend-client';
 import { AnalyzeProgress } from './AnalyzeProgress';
+import { useT } from '../i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,8 +39,9 @@ function isValidGithubUrl(value: string): boolean {
 // ── Mode tabs ────────────────────────────────────────────────────────────────
 
 function ModeTabs({ mode, onChange }: { mode: InputMode; onChange: (m: InputMode) => void }) {
+  const t = useT();
   return (
-    <div className="flex gap-1 rounded-lg bg-elevated p-1" role="tablist" aria-label="Input type">
+    <div className="flex gap-1 rounded-lg bg-elevated p-1" role="tablist" aria-label={t('repoAnalyzer.inputType')}>
       <button
         role="tab"
         aria-selected={mode === 'github'}
@@ -51,7 +53,7 @@ function ModeTabs({ mode, onChange }: { mode: InputMode; onChange: (m: InputMode
         } `}
       >
         <Github className="h-3 w-3" />
-        GitHub URL
+        {t('repoAnalyzer.githubURL')}
       </button>
       <button
         role="tab"
@@ -64,7 +66,7 @@ function ModeTabs({ mode, onChange }: { mode: InputMode; onChange: (m: InputMode
         } `}
       >
         <FolderOpen className="h-3 w-3" />
-        Local Folder
+        {t('repoAnalyzer.localFolder')}
       </button>
     </div>
   );
@@ -83,6 +85,7 @@ function AnalyzeButton({
   onClick: () => void;
   variant: 'onboarding' | 'sheet';
 }) {
+  const t = useT();
   const sizeClass =
     variant === 'onboarding' ? 'w-full px-5 py-3.5 text-sm' : 'w-full px-4 py-3 text-sm';
   return (
@@ -96,7 +99,7 @@ function AnalyzeButton({
       } `}
     >
       {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-      <span>{isLoading ? 'Starting analysis...' : 'Analyze Repository'}</span>
+      <span>{isLoading ? t('repoAnalyzer.startingAnalysis') : t('repoAnalyzer.analyzeRepo')}</span>
       {canSubmit && !isLoading && <ArrowRight className="h-3.5 w-3.5" />}
     </button>
   );
@@ -105,6 +108,7 @@ function AnalyzeButton({
 // ── Done state ───────────────────────────────────────────────────────────────
 
 function DoneState({ repoName }: { repoName: string }) {
+  const t = useT();
   return (
     <div
       className="flex animate-fade-in flex-col items-center gap-3 py-4"
@@ -115,10 +119,10 @@ function DoneState({ repoName }: { repoName: string }) {
         <Check className="h-6 w-6 text-emerald-400" />
       </div>
       <div className="text-center">
-        <p className="text-sm font-medium text-emerald-400">Analysis complete</p>
+        <p className="text-sm font-medium text-emerald-400">{t('repoAnalyzer.analysisComplete')}</p>
         <p className="mt-0.5 font-mono text-xs text-text-muted">{repoName}</p>
       </div>
-      <p className="text-xs text-text-secondary">Loading graph...</p>
+      <p className="text-xs text-text-secondary">{t('repoAnalyzer.loadingGraph')}</p>
     </div>
   );
 }
@@ -134,6 +138,7 @@ export interface RepoAnalyzerProps {
 }
 
 export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProps) => {
+  const t = useT();
   const inputId = useId();
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<InputMode>('github');
@@ -179,11 +184,11 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
 
   const handleAnalyze = async () => {
     if (mode === 'github' && !isValidGithubUrl(githubUrl)) {
-      setValidationError('Please enter a valid GitHub repository URL.');
+      setValidationError(t('repoAnalyzer.invalidGithubURL'));
       return;
     }
     if (mode === 'local' && localPath.trim().length < 2) {
-      setValidationError('Please enter a folder path.');
+      setValidationError(t('repoAnalyzer.invalidFolderPath'));
       return;
     }
 
@@ -212,13 +217,13 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
           }, 1200);
         },
         (errMsg) => {
-          setValidationError(errMsg || 'Analysis failed. Check server logs.');
+          setValidationError(errMsg || t('repoAnalyzer.analysisFailed'));
           setPhase('error');
         },
       );
       sseControllerRef.current = controller;
     } catch (err) {
-      setValidationError(err instanceof Error ? err.message : 'Failed to start analysis');
+      setValidationError(err instanceof Error ? err.message : t('repoAnalyzer.failedToStart'));
       setPhase('error');
     }
   };
@@ -233,7 +238,7 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
       jobIdRef.current = null;
     }
     setPhase('input');
-    setProgress({ phase: 'queued', percent: 0, message: 'Queued' });
+    setProgress({ phase: 'queued', percent: 0, message: t('analyzeProgress.queued') });
   };
 
   const isLoading = phase === 'starting';
@@ -252,7 +257,7 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
             htmlFor={inputId}
             className="block text-xs font-medium tracking-wider text-text-secondary uppercase"
           >
-            GitHub Repository URL
+            {t('repoAnalyzer.githubRepoURLLabel')}
           </label>
           <div
             className={`flex items-center gap-3 rounded-xl border bg-void px-4 py-3.5 transition-all duration-200 ${
@@ -279,7 +284,7 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
                 }
               }}
               disabled={isLoading}
-              placeholder="https://github.com/owner/repo"
+              placeholder={t('repoAnalyzer.githubPlaceholder')}
               autoComplete="url"
               spellCheck={false}
               className="flex-1 border-none bg-transparent font-mono text-sm text-text-primary outline-none placeholder:text-text-muted disabled:opacity-50"
@@ -304,7 +309,7 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
             htmlFor={`${inputId}-local`}
             className="block text-xs font-medium tracking-wider text-text-secondary uppercase"
           >
-            Local Folder Path
+            {t('repoAnalyzer.localFolderPathLabel')}
           </label>
           <div
             className={`flex items-center gap-3 rounded-xl border bg-void px-4 py-3.5 transition-all duration-200 ${
@@ -331,7 +336,11 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
                 }
               }}
               disabled={isLoading}
-              placeholder={isWindows ? 'C:\\Users\\you\\project' : '/home/you/project'}
+              placeholder={
+                isWindows
+                  ? t('repoAnalyzer.windowsPathPlaceholder')
+                  : t('repoAnalyzer.unixPathPlaceholder')
+              }
               autoComplete="off"
               spellCheck={false}
               className="flex-1 border-none bg-transparent font-mono text-sm text-text-primary outline-none placeholder:text-text-muted disabled:opacity-50"
@@ -342,10 +351,11 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
           </div>
           {/* Native folder picker + Browse button — below the input */}
           <input
-            ref={folderInputRef}
+            ref={(node) => {
+              folderInputRef.current = node;
+              node?.setAttribute('webkitdirectory', '');
+            }}
             type="file"
-            // @ts-expect-error -- webkitdirectory is non-standard but widely supported
-            webkitdirectory=""
             className="hidden"
             onChange={(e) => {
               const files = e.target.files;
@@ -367,7 +377,7 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border-subtle bg-elevated px-3 py-2 text-xs font-medium text-text-secondary transition-all duration-150 hover:bg-hover hover:text-text-primary disabled:opacity-50"
           >
             <FolderOpen className="h-3.5 w-3.5" />
-            Browse for folder
+            {t('repoAnalyzer.browseForFolder')}
           </button>
         </div>
       )}
@@ -410,14 +420,14 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
             }}
             className="flex-1 cursor-pointer rounded-xl border border-border-subtle bg-elevated px-4 py-2.5 text-sm text-text-secondary transition-all duration-200 hover:bg-hover hover:text-text-primary"
           >
-            Try again
+            {t('repoAnalyzer.tryAgain')}
           </button>
           {onCancel && (
             <button
               onClick={onCancel}
               className="cursor-pointer px-4 py-2.5 text-sm text-text-muted transition-colors hover:text-text-secondary"
             >
-              Dismiss
+              {t('repoAnalyzer.dismiss')}
             </button>
           )}
         </div>
@@ -429,7 +439,7 @@ export const RepoAnalyzer = ({ variant, onComplete, onCancel }: RepoAnalyzerProp
           onClick={onCancel}
           className="w-full cursor-pointer py-1 text-xs text-text-muted transition-colors hover:text-text-secondary"
         >
-          Hide (analysis continues in background)
+          {t('repoAnalyzer.hideBackground')}
         </button>
       )}
     </div>
