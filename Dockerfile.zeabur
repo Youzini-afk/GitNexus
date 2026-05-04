@@ -11,17 +11,17 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ git && rm -rf /var/lib/apt/lists/*
 
 COPY gitnexus-shared/package.json gitnexus-shared/package-lock.json ./gitnexus-shared/
-RUN npm ci --prefix gitnexus-shared
+RUN npm ci --include=dev --prefix gitnexus-shared
 COPY gitnexus-shared ./gitnexus-shared
 RUN rm -f gitnexus-shared/tsconfig.tsbuildinfo
 RUN npm run build --prefix gitnexus-shared
 
 COPY gitnexus-web/package.json gitnexus-web/package-lock.json ./gitnexus-web/
-RUN npm ci --prefix gitnexus-web
+RUN npm ci --include=dev --prefix gitnexus-web
 COPY gitnexus-web ./gitnexus-web
 
 COPY gitnexus ./gitnexus
-RUN npm ci --prefix gitnexus
+RUN npm ci --include=dev --prefix gitnexus
 RUN npm prune --omit=dev --prefix gitnexus
 
 # ── Runtime ────────────────────────────────────────────────────────────
