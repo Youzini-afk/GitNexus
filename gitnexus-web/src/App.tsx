@@ -21,8 +21,10 @@ import {
   type BackendRepo,
 } from './services/backend-client';
 import { ERROR_RESET_DELAY_MS } from './config/ui-constants';
+import { useT } from './i18n';
 
 const AppContent = () => {
+  const t = useT();
   const {
     viewMode,
     setViewMode,
@@ -116,8 +118,8 @@ const AppContent = () => {
     setProgress({
       phase: 'extracting',
       percent: 0,
-      message: 'Connecting to server...',
-      detail: 'Validating server',
+      message: t('loadingOverlay.connecting'),
+      detail: t('loadingOverlay.validating'),
     });
     setViewMode('loading');
 
@@ -132,8 +134,8 @@ const AppContent = () => {
             setProgress({
               phase: 'extracting',
               percent: 5,
-              message: 'Connecting to server...',
-              detail: 'Validating server',
+              message: t('loadingOverlay.connecting'),
+              detail: t('loadingOverlay.validating'),
             });
           } else if (phase === 'downloading') {
             const pct = total ? Math.round((downloaded / total) * 90) + 5 : 50;
@@ -141,15 +143,15 @@ const AppContent = () => {
             setProgress({
               phase: 'extracting',
               percent: pct,
-              message: 'Downloading graph...',
+              message: t('loadingOverlay.downloading'),
               detail: `${mb} MB downloaded`,
             });
           } else if (phase === 'extracting') {
             setProgress({
               phase: 'extracting',
               percent: 97,
-              message: 'Processing...',
-              detail: 'Extracting file contents',
+              message: t('loadingOverlay.processing'),
+              detail: t('loadingOverlay.extracting'),
             });
           }
         },
@@ -173,7 +175,7 @@ const AppContent = () => {
         setProgress({
           phase: 'error',
           percent: 0,
-          message: 'Failed to connect to server',
+          message: t('dropZone.failedToConnect'),
           detail: err instanceof Error ? err.message : 'Unknown error',
         });
         setTimeout(() => {
@@ -181,7 +183,7 @@ const AppContent = () => {
           setProgress(null);
         }, ERROR_RESET_DELAY_MS);
       });
-  }, [handleServerConnect, setProgress, setViewMode, setServerBaseUrl, setAvailableRepos]);
+  }, [handleServerConnect, setProgress, setViewMode, setServerBaseUrl, setAvailableRepos, t]);
 
   const handleFocusNode = useCallback((nodeId: string) => {
     graphCanvasRef.current?.focusNode(nodeId);
@@ -299,7 +301,7 @@ const AppContent = () => {
 
       {serverDisconnected && (
         <div className="fixed bottom-12 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-yellow-500/30 bg-yellow-900/80 px-4 py-2 text-sm text-yellow-200 shadow-lg backdrop-blur">
-          Server connection lost — reconnecting&hellip;
+          {t('statusBar.serverLost')}
         </div>
       )}
 

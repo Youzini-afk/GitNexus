@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { Heart } from '@/lib/lucide-icons';
 import { useAppState } from '../hooks/useAppState';
+import { useT } from '../i18n';
 
 export const StatusBar = () => {
+  const t = useT();
   const { graph, progress } = useAppState();
 
   const nodeCount = graph?.nodes.length ?? 0;
@@ -42,7 +44,7 @@ export const StatusBar = () => {
         ) : (
           <div className="flex items-center gap-1.5" data-testid="status-ready">
             <span className="h-1.5 w-1.5 rounded-full bg-node-function" />
-            <span>Ready</span>
+            <span>{t('statusBar.ready')}</span>
           </div>
         )}
       </div>
@@ -56,10 +58,10 @@ export const StatusBar = () => {
       >
         <Heart className="h-3.5 w-3.5 animate-pulse fill-pink-500/40 text-pink-500 transition-all duration-200 group-hover:scale-110 group-hover:fill-pink-500" />
         <span className="text-[11px] font-medium text-pink-400 transition-colors group-hover:text-pink-300">
-          Sponsor
+          {t('statusBar.sponsor')}
         </span>
         <span className="hidden text-[10px] text-pink-300/50 italic transition-colors group-hover:text-pink-300/80 md:inline">
-          need to buy some API credits to run SWE-bench 😅
+          {t('statusBar.sponsorNote')}
         </span>
       </a>
 
@@ -67,9 +69,9 @@ export const StatusBar = () => {
       <div className="flex items-center gap-3" data-testid="graph-stats">
         {graph && (
           <>
-            <span>{nodeCount} nodes</span>
+            <span>{t('header.nodes', { count: nodeCount })}</span>
             <span className="text-border-default">•</span>
-            <span>{edgeCount} edges</span>
+            <span>{t('header.edges', { count: edgeCount })}</span>
             {primaryLanguage && (
               <>
                 <span className="text-border-default">•</span>
