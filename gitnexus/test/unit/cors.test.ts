@@ -13,8 +13,25 @@
  *   - https://gitnexus.vercel.app     → allowed
  *   - Everything else                 → rejected
  */
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { isAllowedOrigin } from '../../src/server/api.js';
+
+const originalCorsOrigins = process.env.GITNEXUS_CORS_ORIGINS;
+const originalCorsOrigin = process.env.GITNEXUS_CORS_ORIGIN;
+
+afterEach(() => {
+  if (originalCorsOrigins === undefined) {
+    delete process.env.GITNEXUS_CORS_ORIGINS;
+  } else {
+    process.env.GITNEXUS_CORS_ORIGINS = originalCorsOrigins;
+  }
+
+  if (originalCorsOrigin === undefined) {
+    delete process.env.GITNEXUS_CORS_ORIGIN;
+  } else {
+    process.env.GITNEXUS_CORS_ORIGIN = originalCorsOrigin;
+  }
+});
 
 // ─── No origin (non-browser / curl) ──────────────────────────────────
 
@@ -57,6 +74,31 @@ describe('isAllowedOrigin: vercel.app', () => {
 
   it('rejects other vercel.app subdomains', () => {
     expect(isAllowedOrigin('https://evil.vercel.app')).toBe(false);
+  });
+});
+
+// ─── Operator-configured origins ──────────────────────────────────────
+
+describe('isAllowedOrigin: configured origins', () => {
+  it('allows origins configured through GITNEXUS_CORS_ORIGINS', () => {
+    process.env.GITNEXUS_CORS_ORIGINS =
+      'https://gitnexus-web.example.com, https://gitnexus.zeabur.app/';
+
+    expect(isAllowedOrigin('https://gitnexus-web.example.com')).toBe(true);
+    expect(isAllowedOrigin('https://gitnexus.zeabur.app')).toBe(true);
+  });
+
+  it('allows origins configured through legacy singular GITNEXUS_CORS_ORIGIN', () => {
+    process.env.GITNEXUS_CORS_ORIGIN = 'https://single-origin.example.com';
+
+    expect(isAllowedOrigin('https://single-origin.example.com')).toBe(true);
+  });
+
+  it('normalizes configured origins to exact origins only', () => {
+    process.env.GITNEXUS_CORS_ORIGINS = 'https://gitnexus.example.com/app/path';
+
+    expect(isAllowedOrigin('https://gitnexus.example.com')).toBe(true);
+    expect(isAllowedOrigin('https://evil.example.com')).toBe(false);
   });
 });
 

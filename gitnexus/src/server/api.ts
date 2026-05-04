@@ -39,6 +39,29 @@ import { extractRepoName, getCloneDir, cloneOrPull } from './git-clone.js';
 const _require = createRequire(import.meta.url);
 const pkg = _require('../../package.json');
 
+const configuredCorsOrigins = (): Set<string> => {
+  const rawOrigins = [process.env.GITNEXUS_CORS_ORIGINS, process.env.GITNEXUS_CORS_ORIGIN]
+    .filter((value): value is string => Boolean(value))
+    .flatMap((value) => value.split(','));
+
+  const origins = new Set<string>();
+  for (const rawOrigin of rawOrigins) {
+    const candidate = rawOrigin.trim().replace(/\/+$/, '');
+    if (!candidate) continue;
+
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        origins.add(parsed.origin);
+      }
+    } catch {
+      // Ignore malformed operator-provided origins instead of widening CORS.
+    }
+  }
+
+  return origins;
+};
+
 /**
  * Determine whether an HTTP Origin header value is allowed by CORS policy.
  *
@@ -71,6 +94,10 @@ export const isAllowedOrigin = (origin: string | undefined): boolean => {
     origin === 'http://[::1]' ||
     origin === 'https://gitnexus.vercel.app'
   ) {
+    return true;
+  }
+
+  if (configuredCorsOrigins().has(origin)) {
     return true;
   }
 

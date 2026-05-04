@@ -85,7 +85,7 @@ program
 program
   .command('serve')
   .description('Start local HTTP server for web UI connection')
-  .option('-p, --port <port>', 'Port number', '4747')
+  .option('-p, --port <port>', 'Port number (defaults to PORT env, then 4747)')
   .option('--host <host>', 'Bind address (default: 127.0.0.1, use 0.0.0.0 for remote access)')
   .action(createLazyAction(() => import('./serve.js'), 'serveCommand'));
 

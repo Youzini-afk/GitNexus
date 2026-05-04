@@ -12,12 +12,19 @@ process.on('unhandledRejection', (reason: any) => {
   process.exit(1);
 });
 
-export const serveCommand = async (options?: { port?: string; host?: string }) => {
-  const port = Number(options?.port ?? 4747);
+export const resolveServeOptions = (options?: { port?: string; host?: string }) => {
+  const port = Number(options?.port ?? process.env.PORT ?? 4747);
   // Default to 'localhost' so the OS decides whether to bind to 127.0.0.1 or
   // ::1 based on system configuration, avoiding spurious CORS errors when the
-  // hosted frontend at gitnexus.vercel.app connects to localhost.
-  const host = options?.host ?? 'localhost';
+  // hosted frontend at gitnexus.vercel.app connects to localhost. Hosted
+  // platforms such as Zeabur provide PORT and expect 0.0.0.0 binding.
+  const host = options?.host ?? (process.env.PORT ? '0.0.0.0' : 'localhost');
+
+  return { port, host };
+};
+
+export const serveCommand = async (options?: { port?: string; host?: string }) => {
+  const { port, host } = resolveServeOptions(options);
 
   try {
     await createServer(port, host);
