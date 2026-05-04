@@ -113,6 +113,31 @@ npx gitnexus serve
 
 Use when the browser UI should talk to **local** indexed repos instead of WASM-only mode.
 
+### Optional single-password auth
+
+Set `GITNEXUS_AUTH_PASSWORD` to require a password before serving the Web UI, HTTP API, or MCP-over-HTTP endpoint:
+
+```bash
+GITNEXUS_AUTH_PASSWORD='use-a-long-random-password' npx gitnexus serve
+```
+
+Behavior:
+
+- Unset `GITNEXUS_AUTH_PASSWORD` keeps the historical no-auth behavior.
+- Empty or whitespace-only values fail startup instead of silently disabling auth.
+- Browser requests to the Web UI redirect to `/login`; API and MCP HTTP requests return `401` until logged in.
+- Login creates an in-memory `HttpOnly; SameSite=Lax` session cookie; sessions are lost on process restart.
+- Same-origin deployments, including the single-service Zeabur Dockerfile, work with browser cookies by default.
+- Cross-origin Web UI deployments and non-browser MCP clients are not fully covered by the cookie login flow; put them behind the same origin/proxy or add separate client credential support.
+
+For Zeabur single-service deployments, set the existing persistent paths plus the password:
+
+```env
+GITNEXUS_HOME=/data/gitnexus
+HF_HOME=/data/gitnexus/hf-cache
+GITNEXUS_AUTH_PASSWORD=<long-random-password>
+```
+
 ---
 
 ## CLI equivalents of MCP tools
