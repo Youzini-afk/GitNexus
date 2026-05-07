@@ -52,7 +52,15 @@ const invokeHandler = async (app: MockApp, method: string, reqPath: string) => {
       send: vi.fn().mockReturnThis(),
       setHeader: vi.fn(),
     };
-    await route.handler[0]({ path: reqPath } as any, res, vi.fn());
+    const req = { path: reqPath } as any;
+    for (const handler of route.handler) {
+      let nextCalled = false;
+      await handler(req, res, (err?: unknown) => {
+        if (err) throw err;
+        nextCalled = true;
+      });
+      if (handler.length >= 3 && !nextCalled) break;
+    }
     return res;
   }
   return null;
